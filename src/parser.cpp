@@ -211,7 +211,8 @@ struct parse_node
 };
 
 std::vector<parse_node> expressions = {
-	parse_node("assignment", { "identifier", "operator:=", "number|string" })
+	parse_node("assignment", { "identifier", "operator:=", "number|string" }),
+	parse_node("nop", { "separator" })
 };
 
 /**
@@ -252,6 +253,8 @@ tree_node run_through(const tree_node& program)
 	while (token_index < program.size())
 		for (auto& expr : expressions)
 		{
+			if (token_index >= program.size()) break;
+
 			auto [success, length, toks] = expr.try_match(program, token_index);
 			if (success)
 			{
