@@ -54,15 +54,15 @@ int main(int argc, char** argv)
 		std::cerr << "Lexer failed.\nError: " << tokens.back().value << std::endl;
 		return -1;
 	}
-	
+
 	auto parsed = parser::parse(tokens);
 
 	for (auto& c1 : parsed.children())
 	{
-		std::cout << c1.type() << ": " << c1.value() << std::endl;
+		std::cout << c1.type() << ": " << (c1.value() == "\n" ? "\\n" : c1.value()) << std::endl;
 		for (auto& c2 : c1.children())
 		{
-			std::cout << "\t" << c2.type() << ": " << c2.value() << std::endl;
+			std::cout << "\t" << c2.type() << ": " << (c2.value() == "\n" ? "\\n" : c2.value()) << std::endl;
 		}
 	}
 

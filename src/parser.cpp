@@ -267,8 +267,6 @@ tree_node run_through(const tree_node& program)
 				result.add_child(program[token_index]);
 				token_index++;
 			}
-
-			if (token_index >= program.size()) break;
 		}
 
 	if (result == program)
