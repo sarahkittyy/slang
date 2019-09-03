@@ -26,7 +26,7 @@ struct matcher
 	 * 	2: int -> Length of match
 	 * 	3: string -> matched token value
 	 */
-	std::tuple<bool, int, std::string> try_match(const std::string& code)
+	std::tuple<bool, int, std::string> try_match(const std::string& code) const
 	{
 		std::cmatch m;
 		if (std::regex_search(code.c_str(), m, regex) && m.position() == 0)
