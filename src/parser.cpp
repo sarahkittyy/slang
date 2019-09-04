@@ -125,19 +125,6 @@ tree_node* tree_node::next() const
 }
 
 /**
- * * Match expressions
- * 
- * Substitutions:
- * name => basic token type
- * name:value => basic token type with value `value`
- * 
- * | => logical OR
- * \* => any amount
- * + => one or more
- * 
- */
-
-/**
  * @brief Returns true if the given tree node matches the given expression.
  * 
  * @param expr The non-compounded match expression
@@ -240,6 +227,14 @@ std::tuple<bool, int> does_match_expr(const std::string& expr, const tree_node& 
 							
 							return true; // 0 or more matches will return true always anyway.
 						}
+						else if (type.back() == '?') //* one or none.
+						{
+							type.pop_back();
+							
+							captured_length = (size_t)matches(node);
+							
+							return true;
+						}
 						else
 						{
 							captured_length = 1;
@@ -262,10 +257,17 @@ struct parse_node
 	std::string type;
 	/// The parse node match expression
 	std::vector<std::string> match_expr;
+	/// If there's no match expression, there'll just be a simple regex.
+	std::regex regex;
 
 	/// Default constructor
-	parse_node(std::string type, std::vector<std::string> match_expr)
+	parse_node(std::string type, std::initializer_list<std::string> match_expr)
 		: type(type), match_expr(match_expr)
+	{
+	}
+
+	parse_node(std::string type, std::string match_expr)
+		: type(type), regex(match_expr)
 	{
 	}
 
@@ -281,6 +283,22 @@ struct parse_node
 	 */
 	std::tuple<bool, int, std::vector<tree_node>> try_match(const tree_node& program, size_t begin = 0) const
 	{
+		//* First, check if there's no match expr, and it's just a regex.
+		if (match_expr.size() == 0)
+		{
+			const tree_node& node = program[begin];
+			if (std::regex_match(node.value(), regex))
+			{
+				return {
+					true, 1, program.child_slice(begin, begin + 1)
+				};
+			}
+			else
+			{
+				return { false, -1, {} };
+			}
+		}   // now it's defs not a regex expression.
+
 		// Iterate over all match criteria
 		size_t token_length_sum = 0;
 		for (size_t i = 0; i < match_expr.size(); ++i)
@@ -306,12 +324,30 @@ struct parse_node
 };
 
 /**
+ * * Match expressions
+ * 
+ * Substitutions:
+ * name => basic token type
+ * name:value => basic token type with value `value`
+ * 
+ * | => logical OR
+ * \* => any amount
+ * + => one or more
+ * \? => doesn't have to be there
+ * 
+ */
+
+/**
  * @brief All available compound expression matchers.
  * 
  */
 std::vector<parse_node> expressions = {
 	parse_node("assignment", { "identifier", "operator:=", "number|string|identifier" }),
-	parse_node("nop", { "separator+" })
+	parse_node("nop", { "separator+" }),
+	parse_node("function-call", { "identifier", "function-args" }),
+	parse_node("function-args", "hi|bye") /*,
+	parse_node("function-arg", { "identifier", "colon", "type" }),
+	parse_node("type", "string|number")*/
 };
 
 /**
