@@ -65,6 +65,12 @@ int main(int argc, char** argv)
 	out(3, "Lexing code for tokens.\n");
 	// Lex the code.
 	auto tokens = lexer::lex(code);
+	if (tokens.size() == 0)
+	{
+		std::cerr << "Input file is empty.\n";
+		return -1;
+	}
+
 	// Check for token errors.
 	if (tokens.back().type == "ERROR")
 	{
