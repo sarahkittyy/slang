@@ -392,7 +392,7 @@ struct parse_node
  * @brief All available compound expression matchers.
  * 
  */
-std::vector<parse_node> expressions = {
+static std::vector<parse_node> expressions = {
 	parse_node("arithmetic", { "identifier|number|string", "operator;=", "identifier|number|string" }),
 	parse_node("assignment", { "identifier", "operator:=", "number|string|identifier|expression" }),
 	parse_node("nop", { "separator+" }),
