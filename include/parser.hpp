@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 #include "lexer.hpp"
@@ -24,7 +25,7 @@ public:
 	 */
 	tree_node& add_child(tree_node node, size_t pos = -1);
 	/// Find a child node based on a predicate.
-	tree_node* find_child(std::function<bool(const tree_node& node)> pred);
+	std::optional<tree_node> find_child(std::function<bool(const tree_node& node)> pred) const;
 
 	/// Remove the n-th child.
 	void remove_child(size_t n);
@@ -32,6 +33,7 @@ public:
 	/// Get the n-th tree node
 	tree_node& operator[](size_t n);
 	const tree_node& operator[](size_t n) const;
+	const tree_node& at(size_t n) const;
 	/// Get the amount of children contained in this node.
 	size_t size() const;
 

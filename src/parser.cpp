@@ -35,16 +35,17 @@ tree_node& tree_node::add_child(tree_node node, size_t pos)
 	}
 }
 
-tree_node* tree_node::find_child(std::function<bool(const tree_node& node)> pred)
+std::optional<tree_node>
+tree_node::find_child(std::function<bool(const tree_node& node)> pred) const
 {
 	for (auto& child : m_children)
 	{
 		if (pred(child))
 		{
-			return &child;
+			return child;
 		}
 	}
-	return nullptr;
+	return {};
 }
 
 void tree_node::remove_child(size_t n)
@@ -56,7 +57,13 @@ tree_node& tree_node::operator[](size_t n)
 {
 	return m_children[n];
 }
+
 const tree_node& tree_node::operator[](size_t n) const
+{
+	return m_children[n];
+}
+
+const tree_node& tree_node::at(size_t n) const
 {
 	return m_children.at(n);
 }
@@ -303,7 +310,7 @@ struct parse_node
  * 
  */
 std::vector<parse_node> expressions = {
-	parse_node("assignment", { "identifier", "operator:=", "number|string" }),
+	parse_node("assignment", { "identifier", "operator:=", "number|string|identifier" }),
 	parse_node("nop", { "separator+" })
 };
 
