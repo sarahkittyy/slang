@@ -89,17 +89,8 @@ int main(int argc, char** argv)
 	out(3, "\nParsing tokens...");
 	auto parsed = parser::parse(tokens);
 
-	out(3, "\nParsing complete. Parse tree (depth 2): \n");
-	std::ostringstream ss;
-	for (auto& c1 : parsed.children())
-	{
-		ss << c1.type() << ": " << (c1.value() == "\n" ? "\\n" : c1.value()) << std::endl;
-		for (auto& c2 : c1.children())
-		{
-			ss << "\t" << c2.type() << ": " << (c2.value() == "\n" ? "\\n" : c2.value()) << std::endl;
-		}
-	}
-	out(3, ss.str());
+	out(3, "\nParsing complete. Parse tree:\n");
+	out(3, parsed.str());
 
 	// Begin interpreting the code.
 	out(0, "-- slang interpreter begin --\n");
@@ -108,8 +99,7 @@ int main(int argc, char** argv)
 
 	out(0, "\n-- slang interpreter end --");
 
-	ss.str("");
-	ss.clear();
+	std::ostringstream ss;
 	for (auto& var : end_state.vars)
 	{
 		ss << var.first << ": " << var.second.type << " = " << var.second.val << std::endl;

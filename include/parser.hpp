@@ -51,6 +51,9 @@ public:
 	/// Get the next tree node from the parent.
 	tree_node* next() const;
 
+	/// Convert to a printable string.
+	std::string str(std::string prefix = "") const;
+
 private:
 	std::string m_type;
 	std::string m_value;

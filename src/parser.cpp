@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <iostream>
 #include <regex>
+#include <sstream>
 #include <stdexcept>
 #include <tuple>
 #include "parser.hpp"
@@ -124,6 +125,19 @@ tree_node* tree_node::next() const
 	}
 }
 
+std::string tree_node::str(std::string prefix) const
+{
+	std::ostringstream ss;
+	ss << prefix << m_type << ": " << m_value << "\n";
+
+	for (auto& child : m_children)
+	{
+		ss << child.str(".." + prefix);
+	}
+
+	return ss.str();
+}
+
 /**
  * @brief Returns true if the given tree node matches the given expression.
  * 
@@ -237,9 +251,14 @@ std::tuple<bool, int> does_match_expr(const std::string& expr, const tree_node& 
 						}
 						else
 						{
-							captured_length = 1;
 							// Types must match, and the value should match only if the value isn't empty.
-							return type == node.type() && ((value == "") != (node.value() == value));
+							if(matches(node))
+							{
+								captured_length = 1;
+								return true;
+							}
+							
+							return false;
 						}
 					}),
 			 captured_length };
@@ -306,8 +325,8 @@ struct parse_node
 			// Get the active match expr.
 			std::string expr = match_expr[i];
 			// Get active node
-			if (i + begin >= program.size()) return { false, -1, {} };
-			const tree_node& node = program[i + begin];
+			if (token_length_sum + begin >= program.size()) return { false, -1, {} };
+			const tree_node& node = program[token_length_sum + begin];
 
 			auto [success, length] = does_match_expr(expr, node);
 			if (!success)
@@ -344,10 +363,7 @@ struct parse_node
 std::vector<parse_node> expressions = {
 	parse_node("assignment", { "identifier", "operator:=", "number|string|identifier" }),
 	parse_node("nop", { "separator+" }),
-	parse_node("function-call", { "identifier", "function-args" }),
-	parse_node("function-args", "hi|bye") /*,
-	parse_node("function-arg", { "identifier", "colon", "type" }),
-	parse_node("type", "string|number")*/
+	parse_node("call", { "identifier", "parens:(", "identifier+", "parens:)" })
 };
 
 /**
@@ -425,7 +441,7 @@ tree_node run_through(const tree_node& program)
 	// If nothing changed, we can stop recursing.
 	if (result == program)
 	{
-		return program;
+		return result;
 	}
 	else
 	{
