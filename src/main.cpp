@@ -73,7 +73,7 @@ int main(int argc, char** argv)
 	}
 
 	// Print all tokens.
-	out(3, "\nTokens retrieved. Tokens: ");
+	out(3, "\nTokens retrieved. Tokens:\n--\n");
 	for (auto& tok : tokens)
 	{
 		out(3, tok.type + ": " + tok.value + "\n");
