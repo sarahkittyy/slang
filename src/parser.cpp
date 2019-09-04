@@ -9,20 +9,27 @@ namespace parser
 {
 
 tree_node::tree_node(std::string type, std::string value)
-	: m_type(type), m_value(value)
+	: m_type(type), m_value(value), m_parent(nullptr), m_index(0)
 {
 }
 
 tree_node& tree_node::add_child(tree_node node, size_t pos)
 {
+	node.m_parent = this;
 	if (pos == -1)
 	{
+		node.m_index = m_children.size();
 		m_children.push_back(node);
 		return m_children.back();
 	}
 	else
 	{
-		return *m_children.insert(m_children.cbegin() + pos, node);
+		tree_node& inserted = *m_children.insert(m_children.cbegin() + pos, node);
+		for (size_t i = 0; i < m_children.size(); ++i)
+		{
+			m_children[i].m_index = i;
+		}
+		return inserted;
 	}
 }
 
@@ -91,6 +98,23 @@ bool tree_node::operator==(const tree_node& other) const
 		   std::equal(m_children.begin(), m_children.end(), other.m_children.begin());
 }
 
+tree_node* tree_node::next() const
+{
+	if (m_parent == nullptr)
+	{
+		throw std::runtime_error("Cannot get sibling of parent node.");
+	}
+
+	if (m_parent->size() == m_index + 1)
+	{
+		return nullptr;
+	}
+	else
+	{
+		return &((*m_parent)[m_index + 1]);
+	}
+}
+
 /**
  * * Match expressions
  * 
@@ -100,6 +124,9 @@ bool tree_node::operator==(const tree_node& other) const
  * [name] => parse node type, when recursively descending.
  * 
  * | => logical OR
+ * \* => any amount
+ * + => one or more
+ * 
  */
 
 /**
@@ -107,8 +134,12 @@ bool tree_node::operator==(const tree_node& other) const
  * 
  * @param expr The non-compounded match expression
  * @param node The node to attempt to match against.
+ * 
+ * @return std::tuple<bool,int>
+ * 	1 => matches or not
+ * 	2 => amount of matches captured.
  */
-bool does_match_expr(const std::string& expr, const tree_node& node)
+std::tuple<bool, int> does_match_expr(const std::string& expr, const tree_node& node)
 {
 	// First, split expression at all logical or-s
 	std::vector<std::string> split = {};
@@ -127,36 +158,93 @@ bool does_match_expr(const std::string& expr, const tree_node& node)
 	}
 	split.push_back(current);
 
-	// Test for any matching expression.
-	return std::any_of(split.begin(),
-					   split.end(),
-					   [&node](const std::string& test) -> bool {
-						   /// Parse node type
-						   if (test.front() == '[' && test.back() == ']')
-						   {
-							   //TODO
-							   return false;
-						   }
-						   else   // Normal token test
-						   {
-							   std::string type;
-							   std::string value;
-							   type = value = "";
-							   // Init name.
-							   if (size_t split_pos = test.find(':'); split_pos != std::string::npos)
-							   {
-								   type  = test.substr(0, split_pos);
-								   value = test.substr(split_pos + 1);
-							   }
-							   else
-							   {
-								   type = test;
-							   }
+	// For
+	size_t captured_length = 0;
 
-							   // Types must match, and the value should match only if the value isn't empty.
-							   return type == node.type() && ((value == "") != (node.value() == value));
-						   }
-					   });
+	// clang-format off
+	// Test for any matching expression.
+	return { 
+		std::any_of(split.begin(),
+					split.end(),
+					[&node, &captured_length](const std::string& test) -> bool {
+						captured_length = 0;
+						/// Parse node type
+						if (test.front() == '[' && test.back() == ']')
+						{
+							//TODO
+							return false;
+						}
+						else   // Normal token test
+						{
+							std::string type;
+							std::string value;
+							type = value = "";
+							// Init name.
+							if (size_t split_pos = test.find(':'); split_pos != std::string::npos)
+							{
+								type  = test.substr(0, split_pos);
+								value = test.substr(split_pos + 1);
+							}
+							else
+							{
+								type = test;
+							}
+
+							if (type.back() == '+')
+							{
+								type.pop_back();
+								// Types must match,
+								bool this_matches = type == node.type() && ((value == "") != (node.value() == value));
+
+								if (!this_matches)
+									return false;
+
+								//... and now we can count how many operators after this we can go
+
+								captured_length = 1;
+
+								tree_node* next = node.next();
+								do
+								{
+									bool matches = next->type() == type && ((value == "") != (next->value() == value));
+									
+									if(!matches) break;
+									
+									captured_length++;
+								} while ((next = next->next()));
+								
+								return true;
+							}
+							else if (type.back() == '*')
+							{
+								type.pop_back();
+								captured_length = 0;
+								
+								if(type == node.type() && ((value == "") != (node.value() == value))) captured_length++;
+								
+								tree_node* next = node.next();
+								
+								do
+								{
+									bool matches = next->type() == type && ((value == "") != (next->value() == value));
+									
+									if(!matches) break;
+									
+									captured_length++;
+								} while((next = next->next()));
+								
+								return true;
+							}
+							else
+							{
+								captured_length = 1;
+								// Types must match, and the value should match only if the value isn't empty.
+								return type == node.type() && ((value == "") != (node.value() == value));
+							}
+						}
+					}),
+			 captured_length };
+	// clang-format on
 }
 
 /**
@@ -190,6 +278,7 @@ struct parse_node
 	std::tuple<bool, int, std::vector<tree_node>> try_match(const tree_node& program, size_t begin = 0) const
 	{
 		// Iterate over all match criteria
+		size_t token_length_sum = 0;
 		for (size_t i = 0; i < match_expr.size(); ++i)
 		{
 			// Get the active match expr.
@@ -198,21 +287,23 @@ struct parse_node
 			if (i + begin >= program.size()) return { false, -1, {} };
 			const tree_node& node = program[i + begin];
 
-			if (!does_match_expr(expr, node))
+			auto [success, length] = does_match_expr(expr, node);
+			if (!success)
 			{
 				return { false, -1, {} };
 			}
+			token_length_sum += length;
 		}
 		// If here, successful match.
 		return {
-			true, match_expr.size(), program.child_slice(begin, begin + match_expr.size())
+			true, token_length_sum, program.child_slice(begin, begin + token_length_sum)
 		};
 	}
 };
 
 std::vector<parse_node> expressions = {
 	parse_node("assignment", { "identifier", "operator:=", "number|string" }),
-	parse_node("nop", { "separator" })
+	parse_node("nop", { "separator+" })
 };
 
 /**

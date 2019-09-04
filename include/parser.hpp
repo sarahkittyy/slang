@@ -46,9 +46,15 @@ public:
 	/// For retrieving a slice of all children.
 	const std::vector<tree_node> child_slice(size_t begin, size_t end) const;
 
+	/// Get the next tree node from the parent.
+	tree_node* next() const;
+
 private:
 	std::string m_type;
 	std::string m_value;
+
+	tree_node* m_parent;
+	size_t m_index;
 
 	std::vector<tree_node> m_children;
 };
