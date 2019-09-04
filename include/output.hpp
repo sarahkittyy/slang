@@ -25,7 +25,7 @@ public:
 	{
 		if (intended_verbosity <= m_verbosity)
 		{
-			std::cout << p;
+			std::cout << p << std::flush;
 		}
 		return *this;
 	}
