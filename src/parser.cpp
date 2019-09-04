@@ -8,6 +8,8 @@
 namespace parser
 {
 
+//! TREE NODE DEFINITIONS
+
 tree_node::tree_node(std::string type, std::string value)
 	: m_type(type), m_value(value), m_parent(nullptr), m_index(0)
 {
@@ -121,7 +123,6 @@ tree_node* tree_node::next() const
  * Substitutions:
  * name => basic token type
  * name:value => basic token type with value `value`
- * [name] => parse node type, when recursively descending.
  * 
  * | => logical OR
  * \* => any amount
@@ -168,79 +169,75 @@ std::tuple<bool, int> does_match_expr(const std::string& expr, const tree_node& 
 					split.end(),
 					[&node, &captured_length](const std::string& test) -> bool {
 						captured_length = 0;
-						/// Parse node type
-						if (test.front() == '[' && test.back() == ']')
+						//! Here we retrieve the requested node type and value.
+						std::string type;
+						std::string value;
+						type = value = "";
+						// Init name.
+						if (size_t split_pos = test.find(':'); split_pos != std::string::npos)
 						{
-							//TODO
-							return false;
+							type  = test.substr(0, split_pos);
+							value = test.substr(split_pos + 1);
 						}
-						else   // Normal token test
+						else
 						{
-							std::string type;
-							std::string value;
-							type = value = "";
-							// Init name.
-							if (size_t split_pos = test.find(':'); split_pos != std::string::npos)
-							{
-								type  = test.substr(0, split_pos);
-								value = test.substr(split_pos + 1);
-							}
-							else
-							{
-								type = test;
-							}
+							type = test;
+						}
+						
+						//* Checks if a given node matches the test type/value.
+						auto matches = [&type, &value](const tree_node& n) -> bool{
+							return n.type() == type && ((value == "") != (n.value() == value));
+						};
 
-							if (type.back() == '+')
+						if (type.back() == '+') //* Greedy regex operator +
+						{
+							type.pop_back();
+
+							// If not even one matches, it's false.
+							if (!matches(node))
+								return false;
+								
+							// Otherwise, we guarentee a length of one.
+							captured_length = 1;
+
+							// We now iterate over all following available nodes,
+							// until one doesn't match.
+							tree_node* next = node.next();
+							do
+							{	
+								if(!matches(*next)) break;
+								
+								captured_length++;
+							} while ((next = next->next()));
+							
+							return true;
+						}
+						else if (type.back() == '*') //* Greedy regex-like operator *
+						{
+							type.pop_back();
+							
+							// Unknown how many captures left.
+							captured_length = 0;
+							
+							// Check the first node.
+							if(matches(node)) captured_length++;
+							
+							// Now we go through all following nodes, accumulating matching ones.
+							tree_node* next = node.next();
+							do
 							{
-								type.pop_back();
-								// Types must match,
-								bool this_matches = type == node.type() && ((value == "") != (node.value() == value));
-
-								if (!this_matches)
-									return false;
-
-								//... and now we can count how many operators after this we can go
-
-								captured_length = 1;
-
-								tree_node* next = node.next();
-								do
-								{
-									bool matches = next->type() == type && ((value == "") != (next->value() == value));
-									
-									if(!matches) break;
-									
-									captured_length++;
-								} while ((next = next->next()));
+								if(!matches(*next)) break;
 								
-								return true;
-							}
-							else if (type.back() == '*')
-							{
-								type.pop_back();
-								captured_length = 0;
-								
-								if(type == node.type() && ((value == "") != (node.value() == value))) captured_length++;
-								
-								tree_node* next = node.next();
-								
-								do
-								{
-									bool matches = next->type() == type && ((value == "") != (next->value() == value));
-									
-									if(!matches) break;
-									
-									captured_length++;
-								} while((next = next->next()));
-								
-								return true;
-							}
-							else
-							{
-								captured_length = 1;
-								// Types must match, and the value should match only if the value isn't empty.
-								return type == node.type() && ((value == "") != (node.value() == value));
-							}
+								captured_length++;
+							} while((next = next->next()));
+							
+							return true; // 0 or more matches will return true always anyway.
+						}
+						else
+						{
+							captured_length = 1;
+							// Types must match, and the value should match only if the value isn't empty.
+							return type == node.type() && ((value == "") != (node.value() == value));
 						}
 					}),
 			 captured_length };
@@ -301,6 +298,10 @@ struct parse_node
 	}
 };
 
+/**
+ * @brief All available compound expression matchers.
+ * 
+ */
 std::vector<parse_node> expressions = {
 	parse_node("assignment", { "identifier", "operator:=", "number|string" }),
 	parse_node("nop", { "separator+" })
@@ -338,37 +339,54 @@ parse_node& get_expression(std::string type)
  */
 tree_node run_through(const tree_node& program)
 {
+	// Resulting tree_node.
 	tree_node result("entry", "entry");
 
+
+	//! Current token/parse_node index into the program.
+	// This is so that we don't keep reading the first few tokens.
 	size_t token_index = 0;
+
+	// Iterate until the token index is past the program token vector size.
 	while (token_index < program.size())
+	{
+		bool match_found = false;
+		// Test all expressions...
 		for (auto& expr : expressions)
 		{
+			// Do not continue if our token size has surpased the amount of tokens available!
 			if (token_index >= program.size()) break;
 
+			//* Attempt to match the program with the current expression, at the current token index.
 			auto [success, length, toks] = expr.try_match(program, token_index);
-			if (success)
+			if (success)   // if it matches..
 			{
+				// add the new node, and move all matching tokens as a subchild of this new child node.
 				tree_node& new_node = result.add_child({ expr.type, "" });
 				for (size_t i = 0; i < length; ++i)
 				{
 					new_node.add_child(toks[i]);
 				}
 				token_index += length;
-			}
-			else
-			{
-				result.add_child(program[token_index]);
-				token_index++;
+				match_found = true;
 			}
 		}
+		//* If no match in the list of expressions was found, just simply append the token.
+		if (!match_found)
+		{
+			result.add_child(program[token_index]);
+			token_index++;
+		}
+	}
 
+	// If nothing changed, we can stop recursing.
 	if (result == program)
 	{
 		return program;
 	}
 	else
 	{
+		// Otherwise, there's still more to run through, recurse deeper.
 		return run_through(result);
 	}
 }
