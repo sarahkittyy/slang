@@ -138,6 +138,24 @@ std::string tree_node::str(std::string prefix) const
 	return ss.str();
 }
 
+size_t tree_node::depth() const
+{
+	size_t depth	  = 0;
+	tree_node* parent = m_parent;
+	if (parent == nullptr)
+	{
+		return 0;
+	}
+
+	do
+	{
+		parent = parent->m_parent;
+		depth++;
+	} while (parent != nullptr);
+
+	return depth;
+}
+
 /**
  * @brief Returns true if the given tree node matches the given expression.
  * 
@@ -194,7 +212,11 @@ std::tuple<bool, int> does_match_expr(const std::string& expr, const tree_node& 
 						
 						//* Checks if a given node matches the test type/value.
 						auto matches = [&type, &value](const tree_node& n) -> bool{
-							return n.type() == type && ((value == "") != (n.value() == value));
+							bool success = n.type() == type;
+							if(value == "")
+								return success;
+							else
+								return success & n.value() == value;
 						};
 
 						if (type.back() == '+') //* Greedy regex operator +
@@ -220,7 +242,7 @@ std::tuple<bool, int> does_match_expr(const std::string& expr, const tree_node& 
 							
 							return true;
 						}
-						else if (type.back() == '*') //* Greedy regex-like operator *
+						else if (type.back() == '*' && type.size() > 1) //* Greedy regex-like operator *
 						{
 							type.pop_back();
 							
@@ -278,15 +300,17 @@ struct parse_node
 	std::vector<std::string> match_expr;
 	/// If there's no match expression, there'll just be a simple regex.
 	std::regex regex;
+	/// Minimum depth into the parent node to be considered.
+	int layer;
 
 	/// Default constructor
-	parse_node(std::string type, std::initializer_list<std::string> match_expr)
-		: type(type), match_expr(match_expr)
+	parse_node(std::string type, std::initializer_list<std::string> match_expr, int layer = 0)
+		: type(type), match_expr(match_expr), layer(layer)
 	{
 	}
 
-	parse_node(std::string type, std::string match_expr)
-		: type(type), regex(match_expr)
+	parse_node(std::string type, std::string match_expr, int layer = 0)
+		: type(type), regex(match_expr), layer(layer)
 	{
 	}
 
@@ -361,9 +385,10 @@ struct parse_node
  * 
  */
 std::vector<parse_node> expressions = {
-	parse_node("assignment", { "identifier", "operator:=", "number|string|identifier" }),
+	parse_node("assignment", { "identifier", "operator:=", "number|string|identifier|expression" }),
 	parse_node("nop", { "separator+" }),
-	parse_node("call", { "identifier", "parens:(", "identifier+", "parens:)" })
+	parse_node("arithmetic", { "identifier|number|string", "operator", "identifier|number|string" }),
+	parse_node("expression", { "parens:(", "expression|arithmetic", "parens:)" })
 };
 
 /**
@@ -399,8 +424,7 @@ parse_node& get_expression(std::string type)
 tree_node run_through(const tree_node& program)
 {
 	// Resulting tree_node.
-	tree_node result("entry", "entry");
-
+	tree_node result(program.type(), program.value());
 
 	//! Current token/parse_node index into the program.
 	// This is so that we don't keep reading the first few tokens.

@@ -54,6 +54,8 @@ public:
 	/// Convert to a printable string.
 	std::string str(std::string prefix = "") const;
 
+	size_t depth() const;
+
 private:
 	std::string m_type;
 	std::string m_value;
