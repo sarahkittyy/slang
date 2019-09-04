@@ -198,6 +198,7 @@ std::tuple<bool, int> does_match_expr(const std::string& expr, const tree_node& 
 						//! Here we retrieve the requested node type and value.
 						std::string type;
 						std::string value;
+						bool negate_value = false;
 						type = value = "";
 						// Init name.
 						if (size_t split_pos = test.find(':'); split_pos != std::string::npos)
@@ -205,18 +206,24 @@ std::tuple<bool, int> does_match_expr(const std::string& expr, const tree_node& 
 							type  = test.substr(0, split_pos);
 							value = test.substr(split_pos + 1);
 						}
+						else if (size_t split_pos = test.find(';'); split_pos != std::string::npos)
+						{
+							type  = test.substr(0, split_pos);
+							value = test.substr(split_pos + 1);
+							negate_value = true;
+						}
 						else
 						{
 							type = test;
 						}
 						
 						//* Checks if a given node matches the test type/value.
-						auto matches = [&type, &value](const tree_node& n) -> bool{
+						auto matches = [&type, &value, &negate_value](const tree_node& n) -> bool{
 							bool success = n.type() == type;
 							if(value == "")
 								return success;
 							else
-								return success & n.value() == value;
+								return success && ((n.value() == value) != negate_value);
 						};
 
 						if (type.back() == '+') //* Greedy regex operator +
@@ -372,6 +379,7 @@ struct parse_node
  * Substitutions:
  * name => basic token type
  * name:value => basic token type with value `value`
+ * name;value => basic token type except value `value`
  * 
  * | => logical OR
  * \* => any amount
@@ -385,9 +393,9 @@ struct parse_node
  * 
  */
 std::vector<parse_node> expressions = {
+	parse_node("arithmetic", { "identifier|number|string", "operator;=", "identifier|number|string" }),
 	parse_node("assignment", { "identifier", "operator:=", "number|string|identifier|expression" }),
 	parse_node("nop", { "separator+" }),
-	parse_node("arithmetic", { "identifier|number|string", "operator", "identifier|number|string" }),
 	parse_node("expression", { "parens:(", "expression|arithmetic", "parens:)" })
 };
 
