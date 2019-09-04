@@ -394,7 +394,7 @@ struct parse_node
  */
 static std::vector<parse_node> expressions = {
 	parse_node("arithmetic", { "identifier|number|string", "operator;=", "identifier|number|string" }),
-	parse_node("assignment", { "identifier", "operator:=", "number|string|identifier|expression" }),
+	parse_node("assignment", { "identifier", "operator:=", "number|string|identifier|expression|arithmetic" }),
 	parse_node("nop", { "separator+" }),
 	parse_node("expression", { "parens:(", "expression|arithmetic", "parens:)" })
 };
@@ -439,7 +439,7 @@ tree_node run_through(const tree_node& program)
 	for (auto& expr : expressions)
 	{
 		// Iterate over all tokens,
-		for (size_t i = 0; i < initial.size(); ++i)
+		for (size_t i = 0; i < initial.size();)
 		{
 			// Attempt to match the current set of tokens with the current expression.
 			auto [success,   // Whether or not it was a successful match.
@@ -457,10 +457,13 @@ tree_node run_through(const tree_node& program)
 				{
 					new_node.add_child(toks[i]);
 				}
+
+				i += length;
 			}
 			else
 			{
 				result.add_child(initial[i]);
+				i++;
 			}
 		}
 		initial = result;
