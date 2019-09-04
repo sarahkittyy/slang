@@ -53,7 +53,8 @@ std::vector<matcher> valid_tokens = {
 	matcher("number", "[0-9]+"),
 	matcher("string", "\".*\""),
 	matcher("operator", "\\+|-|\\*|/|="),
-	matcher("separator", ";|\n")
+	matcher("separator", ";|\n"),
+	matcher("parens", "(|)")
 };
 
 /// Strips leading and trailing whitespace off input string.
