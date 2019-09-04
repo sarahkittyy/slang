@@ -431,54 +431,51 @@ parse_node& get_expression(std::string type)
  */
 tree_node run_through(const tree_node& program)
 {
+	tree_node initial(program);
 	// Resulting tree_node.
 	tree_node result(program.type(), program.value());
 
-	//! Current token/parse_node index into the program.
-	// This is so that we don't keep reading the first few tokens.
-	size_t token_index = 0;
-
-	// Iterate until the token index is past the program token vector size.
-	while (token_index < program.size())
+	// For every expression type...
+	for (auto& expr : expressions)
 	{
-		bool match_found = false;
-		// Test all expressions...
-		for (auto& expr : expressions)
+		// Iterate over all tokens,
+		for (size_t i = 0; i < initial.size(); ++i)
 		{
-			// Do not continue if our token size has surpased the amount of tokens available!
-			if (token_index >= program.size()) break;
+			// Attempt to match the current set of tokens with the current expression.
+			auto [success,   // Whether or not it was a successful match.
+				  length,	// The length of the successful match
+				  toks] =	// The matched tokens, to be moved as a child of the new node.
+				expr.try_match(initial, i);
 
-			//* Attempt to match the program with the current expression, at the current token index.
-			auto [success, length, toks] = expr.try_match(program, token_index);
-			if (success)   // if it matches..
+			if (success)
 			{
-				// add the new node, and move all matching tokens as a subchild of this new child node.
+				// Append a new child.
 				tree_node& new_node = result.add_child({ expr.type, "" });
+
+				// Iterate over all sub-matched tokens, and add them to the new child.
 				for (size_t i = 0; i < length; ++i)
 				{
 					new_node.add_child(toks[i]);
 				}
-				token_index += length;
-				match_found = true;
+			}
+			else
+			{
+				result.add_child(initial[i]);
 			}
 		}
-		//* If no match in the list of expressions was found, just simply append the token.
-		if (!match_found)
-		{
-			result.add_child(program[token_index]);
-			token_index++;
-		}
+		initial = result;
+		result  = tree_node(result.type(), result.value());
 	}
 
 	// If nothing changed, we can stop recursing.
-	if (result == program)
+	if (initial == program)
 	{
-		return result;
+		return initial;
 	}
 	else
 	{
 		// Otherwise, there's still more to run through, recurse deeper.
-		return run_through(result);
+		return run_through(initial);
 	}
 }
 
